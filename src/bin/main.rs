@@ -1,4 +1,4 @@
-use ::chaorder::{chaorder::Illustration, *};
+use chaorder::{draw::TerminalDrawBoard, illustration::Illustration};
 
 use std::collections::HashMap;
 
@@ -36,6 +36,6 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         .into_iter(),
     );
 
-    let mut board = chaorder::TerminalDrawBoard::from(illustration);
+    let mut board = TerminalDrawBoard::from(illustration);
     board.draw()
 }

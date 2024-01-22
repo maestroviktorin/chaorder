@@ -1,20 +1,16 @@
 // Work in progress.
 // TBC = To Be Configured.
 
+use crate::illustration::Illustration;
+
 use crossterm::{self, cursor, terminal};
 
 use rand::prelude::*;
 
-use std::{
-    collections::{HashMap, HashSet},
-    io, thread,
-    time::Duration,
-};
-
-pub type Illustration = HashMap<(u16, u16), char>;
+use std::{collections::HashSet, io, thread, time::Duration};
 
 #[derive(Debug)]
-pub struct TerminalCell {
+struct TerminalCell {
     range_width_coefficient: u16,
     row: u16,
     column: u16,
@@ -57,8 +53,12 @@ impl TerminalDrawBoard {
         )?;
         let mut rng = thread_rng();
 
-        // TODO: Bind `ready` cells register to `Self`.
-        //       It shouldn't float on its own.
+        // Storing `(u16, u16)`s instead of `TerminalCell`s is cheaper
+        // and does not require other overheads associated with mutual exclusion
+        // and `derive`s for `TerminalCell`.
+        //
+        // Also, accounting for "ready" `TerminalCell`s
+        // is a functionality related only to the `draw` method.
         let mut ready: HashSet<(u16, u16)> = HashSet::new();
 
         while ready.len() < self.cells.len() {
@@ -73,6 +73,7 @@ impl TerminalDrawBoard {
 
             // TBC.
             let (lower, upper) = (
+                // Panicking is possible when working with relatively "small" `char`s.
                 (cell.required_char as u32)
                     .saturating_sub(50 / cell.range_width_coefficient as u32),
                 // Panicking is considered unrealistic.
