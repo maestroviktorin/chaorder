@@ -9,5 +9,5 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             .unwrap();
 
     let mut board = TerminalDrawBoard::from(illustration);
-    board.draw()
+    board.draw(Some(&(7, 1)), None, None, None)
 }

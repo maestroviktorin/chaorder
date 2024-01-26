@@ -13,5 +13,5 @@ though not quickly enough to prevent a swirl of gritty dust from entering along 
     let illustration: Illustration = ParseIllustration::from_str(source);
 
     let mut board = TerminalDrawBoard::from(illustration);
-    board.draw()
+    board.draw(None, None, None, None)
 }
