@@ -11,6 +11,8 @@ rand = "0.8.5"
 
 [[example]]
 name = "txt-file"
+crate-type = ["bin"]
 
 [[example]]
 name = "str"
+crate-type = ["bin"]
