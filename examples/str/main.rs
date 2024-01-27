@@ -1,5 +1,5 @@
 use chaorder::{
-    draw::TerminalDrawBoard,
+    draw::Drawer,
     illustration::{Illustration, ParseIllustration},
 };
 
@@ -12,6 +12,8 @@ though not quickly enough to prevent a swirl of gritty dust from entering along 
 
     let illustration: Illustration = ParseIllustration::from_str(source);
 
-    let mut board = TerminalDrawBoard::from(illustration);
-    board.draw(None, None, None, None)
+    let mut draw: Drawer = Drawer::new(illustration)
+        .with_char_range_reduction_factor(3)
+        .into();
+    draw.run()
 }

@@ -31,38 +31,29 @@ impl TerminalCell {
     }
 }
 
-pub struct TerminalDrawBoard {
+pub struct Drawer {
     cells: Vec<TerminalCell>,
+    start: (u16, u16),
+    sleep_nanos: u64,
+    char_range: u32,
+    char_range_reduction_factor: u32,
 }
 
-impl From<Illustration> for TerminalDrawBoard {
-    fn from(illustration: Illustration) -> Self {
-        Self {
-            cells: illustration
-                .keys()
-                .map(|key| TerminalCell::new(key.1, key.0, *illustration.get(key).unwrap()))
-                .collect(),
-        }
+impl Drawer {
+    pub fn new(illustration: Illustration) -> DrawerBuilder {
+        DrawerBuilder::from(illustration)
     }
-}
 
-impl TerminalDrawBoard {
-    pub fn draw(
-        &mut self,
-        start: Option<&(u16, u16)>,
-        sleep_nanos: Option<u64>,
-        char_range: Option<u32>,
-        char_range_reduction_factor: Option<u32>,
-    ) -> Result<(), Box<dyn std::error::Error>> {
+    pub fn run(&mut self) -> Result<(), Box<dyn std::error::Error>> {
         crossterm::execute!(
             io::stdout(),
+            // These two commands must be somehow arranged for a real usage.
             terminal::EnterAlternateScreen,
             terminal::Clear(terminal::ClearType::All)
         )?;
         let mut rng = thread_rng();
 
-        let start = start.unwrap_or(&(0, 0));
-        crossterm::execute!(io::stdout(), cursor::MoveTo(start.1, start.0))?;
+        crossterm::execute!(io::stdout(), cursor::MoveTo(self.start.1, self.start.0))?;
 
         // Storing `(u16, u16)`s instead of `TerminalCell`s is cheaper
         // and does not require other overheads associated with mutual exclusion
@@ -73,9 +64,7 @@ impl TerminalDrawBoard {
         let mut ready: HashSet<(u16, u16)> = HashSet::with_capacity(self.cells.len());
 
         while ready.len() < self.cells.len() {
-            thread::sleep(Duration::from_nanos(
-                sleep_nanos.unwrap_or(SLEEP_NANOS_DEFAULT),
-            ));
+            thread::sleep(Duration::from_nanos(self.sleep_nanos));
 
             let cell = self.cells.choose_mut(&mut rng).unwrap();
 
@@ -85,22 +74,19 @@ impl TerminalDrawBoard {
 
             let (lower, upper) = (
                 // Panicking is possible when working with relatively "small" `char`s.
-                (cell.required_char as u32).saturating_sub(
-                    char_range.unwrap_or(CHAR_RANGE_DEFAULT) / cell.range_width_coefficient,
-                ),
-                // Panicking is considered unrealistic.
                 (cell.required_char as u32)
-                    + char_range.unwrap_or(CHAR_RANGE_DEFAULT) / cell.range_width_coefficient,
+                    .saturating_sub(self.char_range / cell.range_width_coefficient),
+                // Panicking is considered unrealistic.
+                (cell.required_char as u32) + self.char_range / cell.range_width_coefficient,
             );
 
-            cell.range_width_coefficient *=
-                char_range_reduction_factor.unwrap_or(CHAR_RANGE_REDUCTION_FACTOR_DEFAULT);
+            cell.range_width_coefficient *= self.char_range_reduction_factor;
 
             let generated_char = char::from_u32(rng.gen_range(lower..=upper)).unwrap();
 
             crossterm::execute!(
                 io::stdout(),
-                cursor::MoveTo(start.1 + cell.row, start.0 + cell.column)
+                cursor::MoveTo(self.start.1 + cell.row, self.start.0 + cell.column)
             )?;
             print!("{}", generated_char);
 
@@ -108,13 +94,6 @@ impl TerminalDrawBoard {
                 ready.insert((cell.row, cell.column));
             }
         }
-
-        // TODO: Refactor.
-        // When using `draw` on the same `TerminalDrawBoard` instance multiple times, overflow may be caused.
-        self.cells
-            .iter_mut()
-            .map(|cell| cell.range_width_coefficient = 1)
-            .for_each(drop);
 
         crossterm::execute!(
             io::stdout(),
@@ -130,5 +109,81 @@ impl TerminalDrawBoard {
         )?;
 
         Ok(())
+    }
+}
+
+impl From<DrawerBuilder> for Drawer {
+    fn from(draw_builder: DrawerBuilder) -> Self {
+        Self {
+            cells: draw_builder.cells,
+            start: draw_builder.start,
+            sleep_nanos: draw_builder.sleep_nanos,
+            char_range: draw_builder.char_range,
+            char_range_reduction_factor: draw_builder.char_range_reduction_factor,
+        }
+    }
+}
+
+pub struct DrawerBuilder {
+    cells: Vec<TerminalCell>,
+    start: (u16, u16),
+    sleep_nanos: u64,
+    char_range: u32,
+    char_range_reduction_factor: u32,
+}
+
+impl Default for DrawerBuilder {
+    fn default() -> Self {
+        Self {
+            cells: Vec::new(),
+            start: Default::default(),
+            sleep_nanos: SLEEP_NANOS_DEFAULT,
+            char_range: CHAR_RANGE_DEFAULT,
+            char_range_reduction_factor: CHAR_RANGE_REDUCTION_FACTOR_DEFAULT,
+        }
+    }
+}
+
+impl From<Illustration> for DrawerBuilder {
+    fn from(illustration: Illustration) -> Self {
+        Self {
+            cells: illustration
+                .keys()
+                .map(|key| TerminalCell::new(key.1, key.0, *illustration.get(key).unwrap()))
+                .collect(),
+            ..Default::default()
+        }
+    }
+}
+
+impl DrawerBuilder {
+    pub fn with_start(mut self, start: (u16, u16)) -> Self {
+        self.start = start;
+        self
+    }
+
+    pub fn with_sleep_nanos(mut self, sleep_nanos: u64) -> Self {
+        self.sleep_nanos = sleep_nanos;
+        self
+    }
+
+    pub fn with_char_range(mut self, char_range: u32) -> Self {
+        self.char_range = char_range;
+        self
+    }
+
+    pub fn with_char_range_reduction_factor(mut self, char_range_reduction_factor: u32) -> Self {
+        self.char_range_reduction_factor = char_range_reduction_factor;
+        self
+    }
+
+    pub fn build(self) -> Drawer {
+        Drawer {
+            cells: self.cells,
+            start: self.start,
+            sleep_nanos: self.sleep_nanos,
+            char_range: self.char_range,
+            char_range_reduction_factor: self.char_range_reduction_factor,
+        }
     }
 }
