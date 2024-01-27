@@ -1,7 +1,6 @@
 //! A module that provides `Drawer` and other related functionality. Uses `crossterm`.
 
-// TODO: 1. Extract storing of `range_width_coefficient` for each `TerminalCell` to `Drawer::run`.
-//       2. Add symlinks to the docs.
+// TODO: 1. Add symlinks to the docs.
 
 use crate::illustration::Illustration;
 
@@ -9,7 +8,11 @@ use crossterm::{self, cursor, terminal};
 
 use rand::prelude::*;
 
-use std::{collections::HashSet, io, thread, time::Duration};
+use std::{
+    collections::{HashMap, HashSet},
+    io, thread,
+    time::Duration,
+};
 
 const SLEEP_NANOS_DEFAULT: u64 = 30;
 const CHAR_RANGE_DEFAULT: u32 = 200;
@@ -19,17 +22,13 @@ const CHAR_RANGE_REDUCTION_FACTOR_DEFAULT: u32 = 2;
 ///
 /// **Fields description**:  
 /// * `row`: The row coordinate.  
-/// * `column`: The column coordinate.  
-/// * `range_width_coefficient`: The width coefficient range of characters around the cell.
-///   It grows exponentially in the process of work and also exponentially narrows
-///   the range of characters that can be randomly selected.   
+/// * `column`: The column coordinate.     
 /// * `required_char`: The required character for the cell.
 ///   If this character was randomly selected, the terminal cell will not be touched anymore.  
-#[derive(Debug)]
+#[derive(Debug, PartialEq, Eq, Hash)]
 struct TerminalCell {
     row: u16,
     column: u16,
-    range_width_coefficient: u32,
     required_char: char,
 }
 
@@ -45,7 +44,6 @@ impl TerminalCell {
         Self {
             row,
             column,
-            range_width_coefficient: 1,
             required_char,
         }
     }
@@ -98,10 +96,13 @@ impl Drawer {
         // is a functionality related only to the `draw` method.
         let mut ready: HashSet<(u16, u16)> = HashSet::with_capacity(self.cells.len());
 
+        let mut range_width_coefficients: HashMap<&TerminalCell, u32> =
+            HashMap::from_iter(self.cells.iter().map(|cell| (cell, 1)));
+
         while ready.len() < self.cells.len() {
             thread::sleep(Duration::from_nanos(self.sleep_nanos));
 
-            let cell = self.cells.choose_mut(&mut rng).unwrap();
+            let cell = self.cells.choose(&mut rng).unwrap();
 
             if ready.contains(&(cell.row, cell.column)) {
                 continue;
@@ -110,12 +111,13 @@ impl Drawer {
             let (lower, upper) = (
                 // Panicking is possible when working with relatively "small" `char`s.
                 (cell.required_char as u32)
-                    .saturating_sub(self.char_range / cell.range_width_coefficient),
+                    .saturating_sub(self.char_range / range_width_coefficients.get(cell).unwrap()),
                 // Panicking is considered unrealistic.
-                (cell.required_char as u32) + self.char_range / cell.range_width_coefficient,
+                (cell.required_char as u32)
+                    + self.char_range / range_width_coefficients.get(cell).unwrap(),
             );
 
-            cell.range_width_coefficient *= self.char_range_reduction_factor;
+            *range_width_coefficients.get_mut(cell).unwrap() *= self.char_range_reduction_factor;
 
             let generated_char = char::from_u32(rng.gen_range(lower..=upper)).unwrap();
 
@@ -234,7 +236,7 @@ impl DrawerBuilder {
     /// **Example**  
     /// Let `required_char` of the `TerminalCell` is `'A'` whose numeric value is `65`.  
     /// Let `char_range` is `30`.  
-    /// Let **`char_range_reduction_factor`** is 2.  
+    /// Let **`char_range_reduction_factor`** is **`2`**.  
     ///
     /// First time `Drawer` will try to guess `'A'` from `(65 - 30/2^0; 65 + 30/2^0)`, e.g. `(35; 95)`.  
     /// Let it didn't. 😞   
