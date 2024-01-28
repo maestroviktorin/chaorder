@@ -1,4 +1,5 @@
-//! A module that provides `Illustration` type alias and functionality for parsing it from source data.
+//! A module that provides [`Illustration`] type alias
+//! and related [`ParseIllustration`] functionality for parsing it from source data.
 
 use std::{collections::HashMap, fs::read_to_string, io, path::Path};
 
@@ -8,11 +9,11 @@ use std::{collections::HashMap, fs::read_to_string, io, path::Path};
 /// Named `Illustration` for the sake of universality.
 pub type Illustration = HashMap<(u16, u16), char>;
 
-/// Provides methods for parsing `Illustration`s from source data.
+/// Provides methods for parsing [`Illustration`]s from source data.
 pub struct ParseIllustration;
 
 impl ParseIllustration {
-    /// Parses an `Illustration` from a string slice.    
+    /// Parses an [`Illustration`] from a string slice.    
     pub fn from_str(source: &str) -> Illustration {
         source
             .lines()
@@ -25,7 +26,7 @@ impl ParseIllustration {
             .collect()
     }
 
-    /// Parses an `Illustration` from a `.txt` file.
+    /// Parses an [`Illustration`] from a `.txt` file.
     pub fn from_txt(path: &Path) -> io::Result<Illustration> {
         Ok(Self::from_str(&read_to_string(path)?))
     }

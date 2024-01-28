@@ -1,6 +1,4 @@
-//! A module that provides `Drawer` and other related functionality. Uses `crossterm`.
-
-// TODO: 1. Add symlinks to the docs.
+//! A module that provides [`Drawer`] and related functionality. Uses `crossterm`.
 
 use crate::illustration::Illustration;
 
@@ -26,21 +24,21 @@ const CHAR_RANGE_REDUCTION_FACTOR_DEFAULT: u32 = 2;
 /// * `required_char`: The required character for the cell.
 ///   If this character was randomly selected, the terminal cell will not be touched anymore.  
 #[derive(Debug, PartialEq, Eq, Hash)]
-struct TerminalCell {
+pub struct TerminalCell {
     row: u16,
     column: u16,
     required_char: char,
 }
 
 impl TerminalCell {
-    /// Creates a `TerminalCell`.  
+    /// Creates a [`TerminalCell`].  
     ///
-    /// **Parameters**:  
+    /// **Parameters description**:  
     /// * `row`: Row coordinate.  
     /// * `column`: Column coordinate.  
     /// * `required_char`: Required character for the cell.
     ///   If this character was randomly selected, the terminal cell will not be touched anymore.
-    fn new(row: u16, column: u16, required_char: char) -> Self {
+    pub fn new(row: u16, column: u16, required_char: char) -> Self {
         Self {
             row,
             column,
@@ -52,12 +50,12 @@ impl TerminalCell {
 /// A struct that handles the drawing process.  
 ///
 /// **Fields description**:  
-/// * `cells`: Vector of `TerminalCell`s. Can be thought as a "drawing board".
-/// * `start`: Starting position of the drawing.  
+/// * `cells`: [Vector](Vec) of [`TerminalCell`]s. Can be thought as a "drawing board".
+/// * `start`: Starting position of the drawing. The leftmost and uppermost corner. 
 /// *The following fields affect the drawing process speed*
 /// * `sleep_nanos`: Sleep time in nanoseconds between each random cursor movement.
 /// * `char_range`: All possible numeric values of randomly selected characters lie on the `(required_char - char_range; required_char + char_range)` interval.
-/// * `char_range_reduction_factor`: Exponential reduction factor for the character range.
+/// * `char_range_reduction_factor`: Exponential reduction factor of the characters range (so-called "guessing-vicinity").
 pub struct Drawer {
     cells: Vec<TerminalCell>,
     start: (u16, u16),
@@ -67,16 +65,16 @@ pub struct Drawer {
 }
 
 impl Drawer {
-    /// Creates a `DrawerBuilder`.  
+    /// Creates a [`DrawerBuilder`].  
     ///
-    /// **Parameters**  
-    /// `illustration`: `Illustration` to be drawn by the upcoming `Drawer`.
+    /// **Parameters description**  
+    /// `illustration`: [`Illustration`] to be drawn by the upcoming [`Drawer`].
     pub fn new(illustration: Illustration) -> DrawerBuilder {
         DrawerBuilder::default().with_cells(illustration)
     }
 
     /// Starts the drawing process.  
-    /// The drawing process can be configured when creating a `Drawer` with `DrawerBuilder`.
+    /// The drawing process can be configured when creating a [`Drawer`] with [`DrawerBuilder`].
     pub fn run(&mut self) -> Result<(), Box<dyn std::error::Error>> {
         crossterm::execute!(
             io::stdout(),
@@ -150,7 +148,7 @@ impl Drawer {
 }
 
 impl From<DrawerBuilder> for Drawer {
-    // Auto-documented.
+    /// Converts a [`DrawerBuilder`] into a [`Drawer`].
     fn from(draw_builder: DrawerBuilder) -> Self {
         Self {
             cells: draw_builder.cells,
@@ -162,9 +160,9 @@ impl From<DrawerBuilder> for Drawer {
     }
 }
 
-/// A builder for `Drawer`.
+/// A builder for [`Drawer`].
 ///
-/// See `Drawer`'s description.
+/// See [`Drawer`]'s details.
 pub struct DrawerBuilder {
     cells: Vec<TerminalCell>,
     start: (u16, u16),
@@ -187,10 +185,10 @@ impl Default for DrawerBuilder {
 }
 
 impl DrawerBuilder {
-    /// Specifies the `cells` field of the upcoming `Drawer`.  
+    /// Specifies the `cells` field of the upcoming [`Drawer`].  
     ///
-    /// `cells` can be thought as an `Illustration` (which is actually a regular `HashMap`)
-    /// turned into a Vector.
+    /// `cells` can be thought as an [`Illustration`] (which is actually a regular [`HashMap`])
+    /// turned into a [vector](Vec).
     pub fn with_cells(mut self, illustration: Illustration) -> Self {
         self.cells = illustration
             .keys()
@@ -199,16 +197,16 @@ impl DrawerBuilder {
         self
     }
 
-    /// Specifies the `start` field of the upcoming `Drawer`.
+    /// Specifies the `start` field of the upcoming [`Drawer`].
     ///
     /// `start` is the starting coordinates of an upcoming drawing.  
-    /// In other words, the leftmost and uppermost `TerminalCell`.
+    /// In other words, the leftmost and uppermost [`TerminalCell`].
     pub fn with_start(mut self, start: (u16, u16)) -> Self {
         self.start = start;
         self
     }
 
-    /// Specifies the `sleep_nanos` field of the upcoming `Drawer`.  
+    /// Specifies the `sleep_nanos` field of the upcoming [`Drawer`].  
     ///
     /// `sleep_nanos` is the number of nanoseconds during which the thread
     /// will sleep between each random cursor movement.
@@ -217,7 +215,7 @@ impl DrawerBuilder {
         self
     }
 
-    /// Specifies the `char_range` field of the upcoming `Drawer`.  
+    /// Specifies the `char_range` field of the upcoming [`Drawer`].  
     ///
     /// The numeric values of randomly selected characters
     /// are within the `(required_char - char_range; required_char + char_range)` interval.  
@@ -228,28 +226,28 @@ impl DrawerBuilder {
         self
     }
 
-    /// Specifies the `char_range_reduction_factor` field of the upcoming `Drawer`.
+    /// Specifies the `char_range_reduction_factor` field of the upcoming [`Drawer`].
     ///
-    /// After each unsuccessful attempt to guess the `required_char` of a `TerminalCell`,
+    /// After each unsuccessful attempt to guess the `required_char` of a [`TerminalCell`],
     /// its "guessing-vicinity" is narrowed `char_range_reduction_factor` times.  
     ///
     /// **Example**  
-    /// Let `required_char` of the `TerminalCell` is `'A'` whose numeric value is `65`.  
+    /// Let `required_char` of the [`TerminalCell`] is `'A'` whose numeric value is `65`.   
     /// Let `char_range` is `30`.  
     /// Let **`char_range_reduction_factor`** is **`2`**.  
     ///
-    /// First time `Drawer` will try to guess `'A'` from `(65 - 30/2^0; 65 + 30/2^0)`, e.g. `(35; 95)`.  
+    /// First time the `Drawer` will try to guess `'A'` from `(65 - 30/2^0; 65 + 30/2^0)`, e.g. `(35; 95)`.  
     /// Let it didn't. 😞   
-    /// Second time `Drawer` will try to guess `'A'` from `(65 - 30/2^1; 65 + 30/2^1)`, e.g. `(50; 80)`.  
+    /// Second time the `Drawer` will try to guess `'A'` from `(65 - 30/2^1; 65 + 30/2^1)`, e.g. `(50; 80)`.  
     /// Let it didn't again. 😖  
-    /// Third time `Drawer` will try to guess `'A'` from `(65 - 30/2^2; 65 + 30/2^2)`, e.g. `(65; 65)`.  
+    /// Third time the `Drawer` will try to guess `'A'` from `(65 - 30/2^2; 65 + 30/2^2)`, e.g. `(65; 65)`.  
     /// And now it definitely did! 🎊
     pub fn with_char_range_reduction_factor(mut self, char_range_reduction_factor: u32) -> Self {
         self.char_range_reduction_factor = char_range_reduction_factor;
         self
     }
 
-    /// Stops building and returns `Drawer` with all the preliminarily specified fields.
+    /// Stops building and returns [`Drawer`] with all the preliminarily specified fields.
     pub fn build(self) -> Drawer {
         Drawer {
             cells: self.cells,
