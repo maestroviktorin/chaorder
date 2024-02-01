@@ -6,6 +6,8 @@ use crossterm::{self, cursor, terminal};
 
 use rand::prelude::*;
 
+use ratatui::{buffer, widgets::Widget};
+
 use std::{
     collections::{HashMap, HashSet},
     io, thread,
@@ -51,7 +53,7 @@ impl TerminalCell {
 ///
 /// **Fields description**:  
 /// * `cells`: [Vector](Vec) of [`TerminalCell`]s. Can be thought as a "drawing board".
-/// * `start`: Starting position of the drawing. The leftmost and uppermost corner. 
+/// * `start`: Starting position of the drawing. The leftmost and uppermost corner.
 /// *The following fields affect the drawing process speed*
 /// * `sleep_nanos`: Sleep time in nanoseconds between each random cursor movement.
 /// * `char_range`: All possible numeric values of randomly selected characters lie on the `(required_char - char_range; required_char + char_range)` interval.
