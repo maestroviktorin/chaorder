@@ -6,8 +6,6 @@ use crossterm::{self, cursor, terminal};
 
 use rand::prelude::*;
 
-use ratatui::{buffer, widgets::Widget};
-
 use std::{
     collections::{HashMap, HashSet},
     io, thread,
