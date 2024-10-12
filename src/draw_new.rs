@@ -1,18 +1,32 @@
 use crate::illustration::Illustration;
-
 use rand::prelude::*;
-
-use ratatui::{buffer::Buffer, layout::Rect, widgets::Widget};
-
+use ratatui::{buffer::Buffer, layout::Rect, widgets::{StatefulWidget, Widget}};
 use std::{
     collections::{HashMap, HashSet},
     thread,
     time::Duration,
 };
 
-const SLEEP_NANOS_DEFAULT: u64 = 30;
+const SLEEP_NANOS_DEFAULT: u64 = 3000000;
 const CHAR_RANGE_DEFAULT: u32 = 200;
 const CHAR_RANGE_REDUCTION_FACTOR_DEFAULT: u32 = 2;
+
+#[derive(Default)]
+pub struct IllustratorState {
+    pub ready_cells: HashSet<(u16, u16)>,
+    range_width_coefficients: HashMap<(u16, u16), u32>,
+}
+
+impl From<(&Buffer, &Illustration)> for IllustratorState {
+    fn from(tuple: (&Buffer, &Illustration)) -> Self {
+        Self {
+            ready_cells: HashSet::with_capacity(tuple.1.len()),
+            range_width_coefficients: HashMap::from_iter((tuple.0.area().left()..tuple.0.area().right()).flat_map(|col| {
+                (tuple.0.area().top()..tuple.0.area().bottom()).map(move |row| ((col, row), 1))
+            }))
+        }
+    }
+}
 
 pub struct Illustrator {
     illustration: Illustration,
@@ -27,53 +41,48 @@ impl Illustrator {
     }
 }
 
-impl Widget for Illustrator {
-    fn render(self, _: Rect, buf: &mut Buffer) {
+impl StatefulWidget for &Illustrator {
+    type State = IllustratorState;
+
+    fn render(self, area: Rect, buf: &mut Buffer, state: &mut Self::State) {
         let mut rng = thread_rng();
 
-        // Storing `(u16, u16)`s instead of `Cell`s is cheaper
-        // and does not require other overheads associated with mutual exclusion
-        // and `derive`s for `Cell`.
-        //
-        // Also, accounting for "ready" `Cell`s
-        // is a functionality related only to the `draw` method.
-        let mut ready: HashSet<(u16, u16)> = HashSet::with_capacity(buf.area().area() as usize);
+        thread::sleep(Duration::from_nanos(self.sleep_nanos));
 
-        // FIXME.
-        let mut range_width_coefficients: HashMap<(u16, u16), u32> =
-            HashMap::from_iter((buf.area().left()..buf.area().right()).flat_map(|col| {
-                (buf.area().top()..buf.area().bottom()).map(move |row| ((col, row), 1))
-            }));
+        let (col, row) = (
+            rng.gen_range(area.left()..area.right()) as u16,
+            rng.gen_range(area.top()..area.bottom()),
+        );
 
-        while ready.len() < self.illustration.len() {
-            thread::sleep(Duration::from_nanos(self.sleep_nanos));
+        if state.ready_cells.contains(&(col, row)) {
+            return;
+        }
 
-            let rect = buf.area();
-            let (col, row) = (
-                rng.gen_range(rect.left()..rect.right()) as u16,
-                rng.gen_range(rect.top()..rect.bottom()),
-            );
+        let required_char = self.illustration.get(&(row, col)).unwrap().to_owned();
+        let abs_vicinity = self.char_range / state.range_width_coefficients.get(&(col, row)).unwrap();
+        let (lower, upper) = (
+            (required_char as u32).saturating_sub(abs_vicinity),
+            (required_char as u32) + abs_vicinity,
+        );
+        let generated_char = char::from_u32(rng.gen_range(lower..=upper)).unwrap();
 
-            if ready.contains(&(col, row)) {
-                continue;
-            }
+        *state.range_width_coefficients.get_mut(&(col, row)).unwrap() *=
+            self.char_range_reduction_factor;
 
-            let required_char = self.illustration.get(&(row, col)).unwrap().to_owned();
-            let abs_vicinity = self.char_range / range_width_coefficients.get(&(col, row)).unwrap();
-            let (lower, upper) = (
-                (required_char as u32).saturating_sub(abs_vicinity),
-                (required_char as u32) + abs_vicinity,
-            );
-            let generated_char = char::from_u32(rng.gen_range(lower..=upper)).unwrap();
+        if generated_char == required_char {
+            state.ready_cells.insert((col, row));
+        }
 
-            *range_width_coefficients.get_mut(&(col, row)).unwrap() *=
-                self.char_range_reduction_factor;
+        buf.get_mut(col, row).set_char(generated_char);
+    }
+}
 
-            if generated_char == required_char {
-                ready.insert((col, row));
-            }
+impl Widget for Illustrator {
+    fn render(self, area: Rect, buf: &mut Buffer) {
+        let mut state = IllustratorState::from((&buf.to_owned(), &self.illustration));
 
-            buf.get_mut(col, row).set_char(generated_char);
+        while state.ready_cells.len() < self.illustration.len() {
+            StatefulWidget::render(&self, area, buf, &mut state)
         }
     }
 }
